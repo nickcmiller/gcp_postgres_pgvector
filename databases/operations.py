@@ -10,9 +10,9 @@ from sqlalchemy import inspect, text, select, func
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.dialects.postgresql import insert
 
-from cloud_sql_gcp.utils.logging import setup_logging
-from cloud_sql_gcp.utils.serialization import serialize_complex_types, deserialize_complex_types
-from cloud_sql_gcp.utils.retry import db_retry_decorator
+from gcp_postgres_pgvector.utils.logging import setup_logging
+from gcp_postgres_pgvector.utils.serialization import serialize_complex_types, deserialize_complex_types
+from gcp_postgres_pgvector.utils.retry import db_retry_decorator
 
 logger = setup_logging()
 

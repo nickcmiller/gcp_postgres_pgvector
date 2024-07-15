@@ -7,8 +7,8 @@ logger = logging.getLogger(__name__)
 class Config:
     def __init__(self):
         load_dotenv()
-        self.SQL_USER = os.getenv("SQL_USER")
-        self.SQL_PASSWORD = os.getenv("SQL_PASSWORD")
+        self.SQL_USER = os.getenv("ADMIN_USER")
+        self.SQL_PASSWORD = os.getenv("ADMIN_PASSWORD")
         self.SQL_HOST = os.getenv("SQL_HOST")
         self.SQL_DATABASE = os.getenv("SQL_DATABASE")
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
