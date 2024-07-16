@@ -1,0 +1,7 @@
+google-cloud-sql-connector
+numpy
+pg8000
+pgvector
+python-dotenv
+sqlalchemy
+tenacity
