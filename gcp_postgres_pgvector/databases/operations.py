@@ -188,7 +188,8 @@ def read_similar_rows(
     limit: int = 5,
     where_clause: str = None,
     include_embedding: bool = False,
-    included_columns: List[str] = ["id", "text", "title", "start_mins"]
+    included_columns: List[str] = ["id", "text", "title", "start_mins"],
+    similarity_threshold: float = 0.35
 ) -> List[Dict[str, Any]]:
     logger.info(f"Reading similar rows from table '{table_name}'")
     try:
@@ -204,14 +205,20 @@ def read_similar_rows(
             query += f" FROM {table_name}"
             
             if where_clause:
-                query += f" WHERE {where_clause}"
+                query += f" WHERE {where_clause} AND 1 - (embedding <=> CAST(:query_embedding AS vector)) >= :similarity_threshold"
+            else:
+                query += " WHERE 1 - (embedding <=> CAST(:query_embedding AS vector)) >= :similarity_threshold"
             
             query += " ORDER BY similarity DESC LIMIT :limit"
             
             # Execute the query
             result = connection.execute(
                 text(query),
-                {"query_embedding": json.dumps(query_embedding), "limit": limit}
+                {
+                    "query_embedding": json.dumps(query_embedding),
+                    "limit": limit,
+                    "similarity_threshold": similarity_threshold
+                }
             )
             
             # Fetch and process the results
