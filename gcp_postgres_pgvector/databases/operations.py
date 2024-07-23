@@ -22,7 +22,6 @@ def ensure_pgvector_extension(engine: Any) -> None:
     try:
         with engine.begin() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            # Verify the extension was created
             result = conn.execute(text("SELECT extname FROM pg_extension WHERE extname = 'vector'"))
             if result.fetchone() is None:
                 raise Exception("Failed to create pgvector extension")
