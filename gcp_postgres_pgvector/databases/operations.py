@@ -20,10 +20,13 @@ logger = setup_logging()
 def ensure_pgvector_extension(engine: Any) -> None:
     logger.info("Ensuring pgvector extension is enabled")
     try:
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            conn.commit()
-            logger.info("pgvector extension enabled successfully")
+            # Verify the extension was created
+            result = conn.execute(text("SELECT extname FROM pg_extension WHERE extname = 'vector'"))
+            if result.fetchone() is None:
+                raise Exception("Failed to create pgvector extension")
+        logger.info("pgvector extension enabled successfully")
     except Exception as e:
         logger.error(f"Error ensuring pgvector extension: {e}", exc_info=True)
         raise
