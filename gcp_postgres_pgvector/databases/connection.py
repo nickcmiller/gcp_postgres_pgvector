@@ -10,7 +10,8 @@ from gcp_postgres_pgvector.utils.logging import setup_logging
 
 logger = setup_logging()
 
-def create_connector() -> Any:
+def create_connector(
+) -> Any:
     logger.info("Creating Google Cloud SQL connector")
     return Connector()
 
