@@ -193,25 +193,59 @@ def read_similar_rows(
     included_columns: List[str] = ["id", "text", "title", "start_mins"],
     similarity_threshold: float = 0.35
 ) -> List[Dict[str, Any]]:
+    """
+        Reads similar rows from a specified table in the database based on a query embedding.
+
+        This function utilizes a similarity search to find rows in the specified table that are similar 
+        to the provided query embedding. It allows for optional filtering through a WHERE clause, 
+        inclusion of specific columns, and the option to include the embedding in the results. If there is a where clause,
+        the query is executed as a subquery first, then the results are filtered by similarity.
+
+        Parameters:
+        - engine (Any): The database engine used to connect to the database.
+        - table_name (str): The name of the table from which to read similar rows.
+        - query_embedding (List[float]): The embedding vector used to find similar rows.
+        - limit (int, optional): The maximum number of similar rows to return. Defaults to 5.
+        - where_clause (str, optional): An optional SQL WHERE clause to filter the results.
+        - include_embedding (bool, optional): A flag indicating whether to include the embedding in the results. Defaults to False.
+        - included_columns (List[str], optional): A list of column names to include in the results. Defaults to ["id", "text", "title", "start_mins"].
+        - similarity_threshold (float, optional): The minimum similarity score for a row to be included in the results. Defaults to 0.35.
+
+        Returns:
+        - List[Dict[str, Any]]: A list of dictionaries representing the similar rows, each containing the specified columns and their values.
+
+        Raises:
+        - Exception: If there is an error during the database operation, an exception is raised with an error message.
+    """
     logger.info(f"Reading similar rows from table '{table_name}'")
     try:
         with engine.connect() as connection:
             # Construct the base query
-            query = "SELECT id, 1 - (embedding <=> CAST(:query_embedding AS vector)) AS similarity"
-            for column in included_columns:
-                query += f", {column}"
-
-            if include_embedding:
-                query += ", embedding"
-            
-            query += f" FROM {table_name}"
+            columns = ", ".join(included_columns)
+            similarity_calc = "1 - (embedding <=> CAST(:query_embedding AS vector)) AS similarity"
             
             if where_clause:
-                query += f" WHERE {where_clause} AND 1 - (embedding <=> CAST(:query_embedding AS vector)) >= :similarity_threshold"
+                # Use a subquery when there's a where clause
+                subquery = f"SELECT id, {columns}, embedding FROM {table_name} WHERE {where_clause}"
+                query = f"""
+                SELECT id, {similarity_calc}, {columns}
+                FROM ({subquery}) AS filtered_table
+                WHERE {similarity_calc} >= :similarity_threshold
+                ORDER BY similarity DESC
+                LIMIT :limit
+                """
             else:
-                query += " WHERE 1 - (embedding <=> CAST(:query_embedding AS vector)) >= :similarity_threshold"
-            
-            query += " ORDER BY similarity DESC LIMIT :limit"
+                # Direct query when there's no where clause
+                query = f"""
+                SELECT id, {similarity_calc}, {columns}
+                FROM {table_name}
+                WHERE {similarity_calc} >= :similarity_threshold
+                ORDER BY similarity DESC
+                LIMIT :limit
+                """
+
+            if include_embedding:
+                query = query.replace("FROM", ", embedding FROM")
             
             # Execute the query
             result = connection.execute(
