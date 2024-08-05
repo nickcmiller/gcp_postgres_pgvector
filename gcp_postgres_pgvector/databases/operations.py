@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.sql import text
-
+from sqlalchemy.exc import SQLAlchemyError
 
 from gcp_postgres_pgvector.utils.logging import setup_logging
 from gcp_postgres_pgvector.utils.serialization import serialize_complex_types, deserialize_complex_types
@@ -317,23 +317,30 @@ def read_similar_rows(
     similarity_threshold: float = 0.35
 ) -> List[Dict[str, Any]]:
     """
-    Read similar rows from a specified table based on a query embedding.
+        Reads similar rows from the specified table in the PostgreSQL database based on a query embedding.
 
-    Args:
-        engine (Engine): SQLAlchemy engine instance.
-        table_name (str): Name of the table to query.
-        query_embedding (List[float]): The embedding vector to compare against.
-        limit (int): Maximum number of results to return.
-        where_clause (Optional[str]): Additional WHERE clause for filtering.
-        include_embedding (bool): Whether to include the embedding in the results.
-        included_columns (List[str]): Columns to include in the results.
-        similarity_threshold (float): Minimum similarity score for inclusion.
+        This function calculates the similarity of the provided query embedding against the embeddings stored in the specified table.
+        It retrieves rows that meet a defined similarity threshold and can include or exclude the embedding column in the results.
 
-    Returns:
-        List[Dict[str, Any]]: List of similar rows with their similarity scores.
+        Args:
+            engine (Engine): The SQLAlchemy engine instance used to connect to the PostgreSQL database.
+            table_name (str): The name of the table from which to read similar rows.
+            query_embedding (List[float]): The embedding vector to compare against the stored embeddings.
+            limit (int, optional): The maximum number of similar rows to return. Defaults to 5.
+            where_clause (Optional[str], optional): An optional SQL WHERE clause to filter the results. Defaults to None.
+            include_embedding (bool, optional): A flag indicating whether to include the embedding column in the results. Defaults to False.
+            included_columns (List[str], optional): A list of column names to include in the results. Defaults to ["id", "text", "title", "start_mins"].
+            similarity_threshold (float, optional): The minimum similarity score for a row to be included in the results. Defaults to 0.35.
 
-    Raises:
-        SQLAlchemyError: If there's an error executing the query.
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries, each representing a row of similar data from the table.
+
+        Raises:
+            SQLAlchemyError: If there is an error during the execution of the SQL commands to read similar rows.
+
+        Example:
+            To read similar rows from a table named 'documents' using a specific embedding:
+            similar_rows = read_similar_rows(engine, 'documents', query_embedding=[0.1, 0.2, 0.3], limit=10)
     """
     logger.info(f"Reading similar rows from table '{table_name}'")
     try:
@@ -362,8 +369,16 @@ def read_similar_rows(
                     "similarity_threshold": similarity_threshold
                 }
             )
+
+            results = []
+            for row in result:
+                item = dict(row._mapping)  # Convert Row object to dictionary
+                
+                if not include_embedding:
+                    item.pop('embedding', None)
+                results.append(item)
             
-            return [dict(row) for row in result]
+            return results
     except SQLAlchemyError as e:
         logger.error(f"Error reading similar rows: {str(e)}")
         raise
