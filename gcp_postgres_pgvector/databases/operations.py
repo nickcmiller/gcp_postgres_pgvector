@@ -6,7 +6,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from pgvector.sqlalchemy import Vector
 import sqlalchemy
-from sqlalchemy import inspect, text, select, func
+from sqlalchemy import inspect, text, select, func, delete
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import QueuePool
@@ -372,7 +372,7 @@ def read_similar_rows(
 
             results = []
             for row in result:
-                item = dict(row._mapping)  # Convert Row object to dictionary
+                item = dict(row._mapping)
                 
                 if not include_embedding:
                     item.pop('embedding', None)
@@ -395,4 +395,42 @@ def delete_table(
         logger.info(f"Successfully deleted table '{table_name}'")
     except Exception as e:
         logger.error(f"Error deleting table '{table_name}': {e}", exc_info=True)
+        raise
+
+@db_retry_decorator()
+def delete_rows_by_ids(
+    engine: Any,
+    table_name: str,
+    ids: List[Any]
+) -> int:
+    """
+        Delete rows from the specified table based on a list of IDs.
+
+        Args:
+            engine (Any): The SQLAlchemy engine instance.
+            table_name (str): The name of the table to delete rows from.
+            ids (List[Any]): A list of IDs to delete.
+
+        Returns:
+            int: The number of rows deleted.
+
+        Raises:
+            SQLAlchemyError: If there's an error during the deletion process.
+    """
+    logger.info(f"Deleting rows from table '{table_name}' with IDs: {ids}")
+    try:
+        table = sqlalchemy.Table(
+            table_name, 
+            sqlalchemy.MetaData(), 
+            autoload_with=engine
+        )
+        delete_stmt = delete(table).where(table.c.id.in_(ids))
+        
+        with engine.begin() as conn:
+            result = conn.execute(delete_stmt)
+            deleted_count = result.rowcount
+            logger.info(f"Successfully deleted {deleted_count} rows from table '{table_name}'")
+        return deleted_count
+    except SQLAlchemyError as e:
+        logger.error(f"Failed to delete rows from table '{table_name}': {e}", exc_info=True)
         raise
